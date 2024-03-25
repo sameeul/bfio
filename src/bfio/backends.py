@@ -19,6 +19,8 @@ from tifffile import tifffile
 from xml.etree import ElementTree as ET
 from xsdata.utils.dates import DateTimeParser
 
+from bfiocpp import TSTiffReader, Seq
+
 # bfio internals
 import bfio
 import bfio.base_classes
@@ -352,6 +354,87 @@ def clean_ome_xml_for_known_issues(xml: str) -> str:
 
     return xml
 
+class TsOmeTiffReader(bfio.base_classes.AbstractReader):
+    logger = logging.getLogger("bfio.backends.TsOmeTiffReader")
+
+    _rdr = None
+    _offsets_bytes = None
+    _STATE_DICT = ["_metadata", "frontend"]
+
+    def __init__(self, frontend):
+        super().__init__(frontend)
+
+        self.logger.debug("__init__(): Initializing _rdr (tifffile.TiffFile)...")
+        self._rdr = TSTiffReader(self.frontend._file_path)
+
+        width = self._rdr._X
+        height = self._rdr._Y
+
+        # do test for strip mages
+
+        # do test for interleaved images
+
+        # do test for dimension order
+
+
+    def __getstate__(self) -> Dict:
+        state_dict = {n: getattr(self, n) for n in self._STATE_DICT}
+        state_dict.update({"file_path": self.frontend._file_path})
+
+        return state_dict
+
+    def __setstate__(self, state) -> None:
+        for k, v in state.items():
+            if k == "file_path":
+                pass
+            else:
+                setattr(self, k, v)
+
+    def read_metadata(self):
+        self.logger.debug("read_metadata(): Reading metadata...")
+        #ToDo
+
+
+    def _process_chunk(self, args):
+        out = self._image
+
+        w, l, d, c, t = self._tile_indices[args[1]]
+
+
+        self.logger.debug("_process_chunk(): shape = {}".format(shape))
+        self.logger.debug(
+            "_process_chunk(): (w,l,d) = {},{},{}".format(w[0], l[0], d[0])
+        )
+
+        if self.load_tiles:
+            width = out.shape[6]
+            height = out.shape[5]
+            out[
+                d[0],
+                c[0],
+                t[0],
+                l[0] // self._TILE_SIZE[0],
+                w[0] // self._TILE_SIZE[1],
+                :height,
+                :width,
+            ] = segment[0, :height, :width, 0]
+        else:
+            width = min(out.shape[4] - w[0], self._TILE_SIZE[1])
+            height = min(out.shape[3] - l[0], self._TILE_SIZE[0])
+            out[d[0], c[0], t[0], l[0] : l[0] + height, w[0] : w[0] + width] = segment[
+                0, :height, :width, 0
+            ]
+
+    def _read_image(self, X, Y, Z, C, T, output):
+        self.logger.debug("read_image(): _tile_indices = {}".format(self._tile_indices))
+        #ToDo
+
+
+    def close(self):
+        pass
+
+    def __del__(self):
+        self.close()
 
 class PythonReader(bfio.base_classes.AbstractReader):
     logger = logging.getLogger("bfio.backends.PythonReader")
