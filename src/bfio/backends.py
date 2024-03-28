@@ -1,23 +1,20 @@
 # -*- coding: utf-8 -*-
 # import core packages
-import copy
 import io
 import logging
 import shutil
 import struct
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, List, Tuple
 import threading
 
 # Third party packages
 import imagecodecs
 import numpy
 import ome_types
-import re
 from tifffile import tifffile
 from xml.etree import ElementTree as ET
-from xsdata.utils.dates import DateTimeParser
 
 
 # bfio internals

@@ -5,6 +5,8 @@ import struct
 import typing
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import threading
+import multiprocessing
 
 import numpy
 import ome_types
@@ -13,7 +15,7 @@ import tifffile
 
 from bfio import backends
 from bfio.base_classes import BioBase
-
+from bfio.ts_backends import TsOmeTiffReader
 
 
 class BioReader(BioBase):
@@ -79,7 +81,17 @@ class BioReader(BioBase):
                 image type, this will be ignored
         """
         # Initialize BioBase
-        super(BioReader, self).__init__(file_path, max_workers=max_workers)
+        super(BioReader, self).__init__(file_path)
+
+        if backend != "tensorstore":
+            self.max_workers = (
+                max_workers
+                if max_workers is not None
+                else max([multiprocessing.cpu_count() // 2, 1])
+            )
+
+            # Create an thread lock for the object
+            self._lock = threading.Lock()
 
         self.clean_metadata = clean_metadata
         self.set_backend(backend)
@@ -88,8 +100,8 @@ class BioReader(BioBase):
         self.logger.debug("Starting the backend...")
         if self._backend_name == "python":
             self._backend = backends.PythonReader(self)
-        # elif self._backend_name == "tensorstore":
-        #     self._backend = backends.TsOmeTiffReader(self)
+        elif self._backend_name == "tensorstore":
+            self._backend = TsOmeTiffReader(self)
         elif self._backend_name == "bioformats":
             try:
                 self._backend = backends.JavaReader(self)
@@ -314,8 +326,8 @@ class BioReader(BioBase):
         C = self._val_ct(C, "C")
         T = self._val_ct(T, "T")
 
-        if self._backend_name == "tensorstor":
-            pass
+        if self._backend_name == "tensorstore":
+            return self._backend.read_image(X,Y,Z,C,T)
         else:
 
             # Define tile bounds
@@ -974,10 +986,17 @@ class BioWriter(BioBase):
         """
         super(BioWriter, self).__init__(
             file_path=file_path,
-            max_workers=max_workers,
             read_only=False,
         )
 
+        self.max_workers = (
+            max_workers
+            if max_workers is not None
+            else max([multiprocessing.cpu_count() // 2, 1])
+        )
+
+        # Create an thread lock for the object
+        self._lock = threading.Lock()
         if metadata:
             assert metadata.__class__.__name__ == "OME"
             self._metadata = metadata.model_copy(deep=True)

@@ -89,7 +89,6 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def __init__(
         self,
         file_path: typing.Union[str, Path],
-        max_workers: typing.Optional[int] = None,
         read_only: typing.Optional[bool] = True,
     ):
         """Initialize BioBase object.
@@ -109,14 +108,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
             file_path = Path(file_path)
         self._file_path = file_path
 
-        self.max_workers = (
-            max_workers
-            if max_workers is not None
-            else max([multiprocessing.cpu_count() // 2, 1])
-        )
 
-        # Create an thread lock for the object
-        self._lock = threading.Lock()
 
     def __setitem__(self, keys: typing.Union[list, tuple], values: numpy.ndarray):
         raise NotImplementedError(
@@ -797,4 +789,57 @@ class AbstractWriter(AbstractBackend):  # NOQA: D101
 
     @abc.abstractmethod
     def _write_image(*args):
+        pass
+
+class TSAbstractBackend(object, metaclass=abc.ABCMeta):
+    """Base class for backend readers/writers."""
+
+    @abc.abstractmethod
+    def __init__(self, frontend: BioBase):
+        """Initialize an Abstract backend.
+
+        Args:
+            frontend (BioBase): The BioBase object associated with the backend.
+        """
+        self.frontend = frontend
+
+
+    @abc.abstractmethod
+    def close(self):
+        """Close the file associated with the backend.
+
+        This method must be implemented by all subclasses to properly cleanup
+        files when file io is completed.
+        """
+        pass
+
+
+class TSAbstractReader(TSAbstractBackend):
+    """Base class for file readers.
+
+    All reader objects must be a subclass of AbstractReader.
+    """
+
+    _metadata: ome_types.OME = None
+
+    @abc.abstractmethod
+    def __init__(self, frontend: BioBase):
+        """Initialize the reader object.
+
+        Args:
+            frontend (BioBase): The BioBase object associated with the backend.
+        """
+        super().__init__(frontend)
+
+    @abc.abstractmethod
+    def read_metadata(self):
+        """Read OME metadata from the file.
+
+        Subclasses must override this to properly retrieve and format the data.
+        """
+        pass
+    @abc.abstractmethod
+    def read_image(self, *args):
+        """Abstract read image executor.
+        """
         pass
