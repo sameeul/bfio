@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
 import threading
-
+from time import time
 # Third party packages
 import tifffile
 import imagecodecs
@@ -36,9 +36,12 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
 
         self.logger.debug("__init__(): Initializing _rdr (tifffile.TiffFile)...")
         self._rdr = TSTiffReader(str(self.frontend._file_path))
-        self.read_metadata()
-        width = self._rdr._X
-        height = self._rdr._Y
+        # self.read_metadata()
+        self.X = self._rdr._X
+        self.Y = self._rdr._Y
+        self.Z = self._rdr._Z
+        self.C = self._rdr._C
+        self.T = self._rdr._T
 
         # do test for strip mages
 
@@ -63,16 +66,14 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
     def read_metadata(self):
         #ToDo
         self.logger.debug("read_metadata(): Reading metadata...")
-
-        tmp_tiff_rdr = tifffile.TiffFile(self.frontend._file_path)
         if self._metadata is None:
             try:
                 self._metadata = ome_types.from_xml(
-                    tmp_tiff_rdr.ome_metadata, validate=False
+                    self._rdr.ome_metadata(), validate=False
                 )
             except (ET.ParseError, ValueError):
                 if self.frontend.clean_metadata:
-                    cleaned = clean_ome_xml_for_known_issues(tmp_tiff_rdr.ome_metadata)
+                    cleaned = clean_ome_xml_for_known_issues(self._rdr.ome_metadata())
                     self._metadata = ome_types.from_xml(cleaned, validate=False)
                     self.logger.warning(
                         "read_metadata(): OME XML required reformatting."
@@ -87,6 +88,7 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
     def read_image(self, X, Y, Z, C, T):
 
         #ToDo
+
         cols = Seq(X[0], X[-1]-1, 1)
         rows = Seq(Y[0], Y[-1]-1, 1)
         layers = Seq(Z[0], Z[-1]-1, 1)

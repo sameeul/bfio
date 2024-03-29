@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import threading
 import multiprocessing
-
+from time import time
 import numpy
 import ome_types
 import tifffile
@@ -138,11 +138,16 @@ class BioReader(BioBase):
             raise ValueError('backend must be "python", "bioformats", or "zarr"')
         self.logger.debug("Finished initializing the backend.")
 
-        # Preload the metadata
-        self._metadata = self._backend.read_metadata()
-
+   
         # Get dims to speed up validation checks
-        self._DIMS = {"X": self.X, "Y": self.Y, "Z": self.Z, "C": self.C, "T": self.T}
+        if self._backend_name == "tensorstore":
+            self._DIMS = {"X": self._backend.X, "Y": self._backend.Y, "Z": self._backend.Z, "C": self._backend.C, "T": self._backend.T}
+            self._metadata = self._backend.read_metadata()
+        else:
+            # Preload the metadata
+            self._metadata = self._backend.read_metadata()
+            self._DIMS = {"X": self.X, "Y": self.Y, "Z": self.Z, "C": self.C, "T": self.T}
+
 
     def python_backend_support(self, filename: str):
         with tifffile.TiffFile(filename) as tif:
@@ -320,12 +325,14 @@ class BioReader(BioBase):
             A 5-dimensional numpy array.
         """
         # Validate inputs
+        t1 = time()
         X = self._val_xyz(X, "X")
         Y = self._val_xyz(Y, "Y")
         Z = self._val_xyz(Z, "Z")
         C = self._val_ct(C, "C")
         T = self._val_ct(T, "T")
-
+        t2 = time()
+        print(f"Time taken for val {(t2-t1)}")
         if self._backend_name == "tensorstore":
             return self._backend.read_image(X,Y,Z,C,T)
         else:
