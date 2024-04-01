@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import threading
 import multiprocessing
-from time import time
 import numpy
 import ome_types
 import tifffile
@@ -135,14 +134,13 @@ class BioReader(BioBase):
                     + "To change back, set the object property."
                 )
         else:
-            raise ValueError('backend must be "python", "bioformats", or "zarr"')
+            raise ValueError('backend must be "python", "bioformats", "tensorstore" or "zarr"')
         self.logger.debug("Finished initializing the backend.")
 
    
         # Get dims to speed up validation checks
         if self._backend_name == "tensorstore":
             self._DIMS = {"X": self._backend.X, "Y": self._backend.Y, "Z": self._backend.Z, "C": self._backend.C, "T": self._backend.T}
-            self._metadata = self._backend.read_metadata()
         else:
             # Preload the metadata
             self._metadata = self._backend.read_metadata()
@@ -325,14 +323,11 @@ class BioReader(BioBase):
             A 5-dimensional numpy array.
         """
         # Validate inputs
-        t1 = time()
         X = self._val_xyz(X, "X")
         Y = self._val_xyz(Y, "Y")
         Z = self._val_xyz(Z, "Z")
         C = self._val_ct(C, "C")
         T = self._val_ct(T, "T")
-        t2 = time()
-        print(f"Time taken for val {(t2-t1)}")
         if self._backend_name == "tensorstore":
             return self._backend.read_image(X,Y,Z,C,T)
         else:
@@ -1091,6 +1086,7 @@ class BioWriter(BioBase):
             "python",
             "bioformats",
             "zarr",
+            "tensorstore",
         ]:
             raise ValueError(
                 'Keyword argument backend must be one of ["python","bioformats","zarr"]'

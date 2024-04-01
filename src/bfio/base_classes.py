@@ -221,6 +221,8 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def __getattribute__(self, name):
         # Get image dimensions using num_x, x, or X
         if len(name) == 1 and name.lower() in "xyzct":
+            if self._metadata is None:
+                self.read_metadata()
             return getattr(
                 self._metadata.images[0].pixels, "size_{}".format(name.lower())
             )
@@ -302,6 +304,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
     @property
     def channel_names(self) -> typing.List[str]:
         """Get the channel names for the image."""
+        if self._metadata is None:
+            self.read_metadata()
+
         image = self._metadata.images[0]
         return [c.name for c in image.pixels.channels]
 
@@ -311,7 +316,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
         assert (
             len(cnames) == self.C
         ), "Number of names does not match number of channels."
-        for channel, cname in zip(self.metadata.images[0].pixels.channels, cnames):
+        for channel, cname in zip(self._metadata.images[0].pixels.channels, cnames):
             channel.name = cname
 
     @property
@@ -368,6 +373,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
         Returns:
             Units per pixel, Units (i.e. "cm" or "mm")
         """
+        if self._metadata is None:
+            self.read_metadata()
+
         return (
             self._metadata.images[0].pixels.physical_size_x,
             self._metadata.images[0].pixels.physical_size_x_unit,
@@ -393,6 +401,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
         Returns:
             Units per pixel, Units (i.e. "cm" or "mm")
         """
+        if self._metadata is None:
+            self.read_metadata()
+
         return (
             self._metadata.images[0].pixels.physical_size_y,
             self._metadata.images[0].pixels.physical_size_y_unit,
@@ -418,6 +429,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
         Returns:
             Units per pixel, Units (i.e. "cm" or "mm")
         """
+        if self._metadata is None:
+            self.read_metadata()
+
         return (
             self._metadata.images[0].pixels.physical_size_z,
             self._metadata.images[0].pixels.physical_size_z_unit,
@@ -505,9 +519,12 @@ class BioBase(object, metaclass=abc.ABCMeta):
     @property
     def dtype(self) -> numpy.dtype:
         """The numpy pixel type of the data."""
+        if self._metadata is None:
+            self.read_metadata()
+
         dtype = numpy.dtype(self._DTYPE[self._metadata.images[0].pixels.type.value])
         return dtype.newbyteorder(
-            ">" if self.metadata.images[0].pixels.big_endian else "<"
+            ">" if self._metadata.images[0].pixels.big_endian else "<"
         )
 
     @dtype.setter
@@ -526,6 +543,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
     @property
     def samples_per_pixel(self) -> int:
         """Number of samples per pixel."""
+        if self._metadata is None:
+            self.read_metadata()
+
         return self._metadata.images[0].pixels.channels[0].samples_per_pixel
 
     @samples_per_pixel.setter
@@ -536,6 +556,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
     @property
     def spp(self):
         """Same as :attr:`.samples_per_pixel`."""
+        if self._metadata is None:
+            self.read_metadata()
+
         return self.samples_per_pixel
 
     @spp.setter
@@ -545,6 +568,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
     @property
     def bytes_per_pixel(self) -> int:
         """Number of bytes per pixel."""
+        if self._metadata is None:
+            self.read_metadata()
+
         return self._BPP[self._metadata.images[0].pixels.type.value]
 
     @bytes_per_pixel.setter
@@ -554,6 +580,9 @@ class BioBase(object, metaclass=abc.ABCMeta):
     @property
     def bpp(self):
         """Same as :attr:`.bytes_per_pixel`."""
+        if self._metadata is None:
+            self.read_metadata()
+
         return self.bytes_per_pixel
 
     @bpp.setter

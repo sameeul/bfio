@@ -34,9 +34,8 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
     def __init__(self, frontend):
         super().__init__(frontend)
 
-        self.logger.debug("__init__(): Initializing _rdr (tifffile.TiffFile)...")
+        self.logger.debug("__init__(): Initializing _rdr (TSTiffReader)...")
         self._rdr = TSTiffReader(str(self.frontend._file_path))
-        # self.read_metadata()
         self.X = self._rdr._X
         self.Y = self._rdr._Y
         self.Z = self._rdr._Z
@@ -64,7 +63,7 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
                 setattr(self, k, v)
 
     def read_metadata(self):
-        #ToDo
+
         self.logger.debug("read_metadata(): Reading metadata...")
         if self._metadata is None:
             try:
@@ -86,8 +85,6 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
 
 
     def read_image(self, X, Y, Z, C, T):
-
-        #ToDo
 
         cols = Seq(X[0], X[-1]-1, 1)
         rows = Seq(Y[0], Y[-1]-1, 1)
