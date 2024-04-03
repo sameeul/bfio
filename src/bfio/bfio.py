@@ -83,7 +83,7 @@ class BioReader(BioBase):
         super(BioReader, self).__init__(file_path)
 
         if backend != "tensorstore":
-            self.max_workers = (
+            self._max_workers = (
                 max_workers
                 if max_workers is not None
                 else max([multiprocessing.cpu_count() // 2, 1])
@@ -109,7 +109,7 @@ class BioReader(BioBase):
                         "The max_workers keyword was present, but bioformats backend "
                         + "only operates with a single worker. Setting max_workers=1."
                     )
-                self.max_workers = 1
+                self._max_workers = 1
             except Exception as err:
                 if repr(err).split("(")[0] in [
                     "UnknownFormatException",
@@ -127,8 +127,8 @@ class BioReader(BioBase):
                     raise
         elif self._backend_name == "zarr":
             self._backend = backends.ZarrReader(self)
-            if self.max_workers == 2:
-                self.max_workers = 1
+            if self._max_workers == 2:
+                self._max_workers = 1
                 self.logger.debug(
                     "Setting max_workers to 1, since max_workers==2 runs slower."
                     + "To change back, set the object property."
@@ -657,20 +657,31 @@ class BioReader(BioBase):
         tile_stride = self._iter_tile_stride
         batch_size = self._iter_batch_size
         channels = self._iter_channels
-        if self._backend == "tensorstore":
-            pass
+        if tile_size is None:
+            raise SyntaxError(
+                "Cannot directly iterate over a BioReader object."
+                + "Call it (i.e. for i in bioreader(256,256))"
+            )
+
+        self._iter_tile_size = None
+        self._iter_tile_stride = None
+        self._iter_batch_size = None
+        self._iter_channels = None
+
+        # input error checking
+        assert len(tile_size) == 2, "tile_size must be a list with 2 elements"
+        if tile_stride is not None:
+            assert len(tile_stride) == 2, "stride must be a list with 2 elements"
         else:
-            if tile_size is None:
-                raise SyntaxError(
-                    "Cannot directly iterate over a BioReader object."
-                    + "Call it (i.e. for i in bioreader(256,256))"
-                )
+            tile_stride = tile_size
 
-            self._iter_tile_size = None
-            self._iter_tile_stride = None
-            self._iter_batch_size = None
-            self._iter_channels = None
+        if self._backend_name == "tensorstore":
 
+            self._backend._rdr.send_iter_read_request(tile_size, tile_stride)
+            for data in self._backend._rdr._image_reader.__iter__():
+                row_index, col_index = self._backend._rdr._image_reader.get_tile_coordinate(data[3], data[5], tile_size[0],  tile_size[1])
+                yield (data[0], data[1], data[2], row_index, col_index), self._backend._rdr._image_reader.get_iterator_requested_tile_data(data[0], data[1], data[2], data[3], data[4], data[5], data[6])
+        else:
             # Ensure that the number of tiles does not exceed the supertile width
             if batch_size is None:
                 batch_size = min([32, self.maximum_batch_size(tile_size, tile_stride)])
@@ -681,12 +692,7 @@ class BioReader(BioBase):
                     self.maximum_batch_size(tile_size, tile_stride)
                 )
 
-            # input error checking
-            assert len(tile_size) == 2, "tile_size must be a list with 2 elements"
-            if tile_stride is not None:
-                assert len(tile_stride) == 2, "stride must be a list with 2 elements"
-            else:
-                tile_stride = tile_size
+
 
             # calculate padding if needed
             if not (set(tile_size) & set(tile_stride)):
@@ -991,7 +997,7 @@ class BioWriter(BioBase):
             read_only=False,
         )
 
-        self.max_workers = (
+        self._max_workers = (
             max_workers
             if max_workers is not None
             else max([multiprocessing.cpu_count() // 2, 1])
@@ -1035,7 +1041,7 @@ class BioWriter(BioBase):
                         "The max_workers keyword was present, but bioformats backend "
                         + "only operates with a single worker. Setting max_workers=1."
                     )
-                self.max_workers = 1
+                self._max_workers = 1
             except Exception as err:
                 if repr(err).split("(")[0] in [
                     "UnknownFormatException",
@@ -1053,8 +1059,8 @@ class BioWriter(BioBase):
                     raise
         elif self._backend_name == "zarr":
             self._backend = backends.ZarrWriter(self)
-            if self.max_workers == 2:
-                self.max_workers = 1
+            if self._max_workers == 2:
+                self._max_workers = 1
                 self.logger.debug(
                     "Setting max_workers to 1, since max_workers==2 runs slower."
                     + "To change back, set the object property."
