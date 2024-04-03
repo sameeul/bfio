@@ -222,7 +222,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
         # Get image dimensions using num_x, x, or X
         if len(name) == 1 and name.lower() in "xyzct":
             if self._metadata is None:
-                self.read_metadata()
+                self._metadata = self._backend.read_metadata()
             return getattr(
                 self._metadata.images[0].pixels, "size_{}".format(name.lower())
             )
@@ -305,7 +305,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def channel_names(self) -> typing.List[str]:
         """Get the channel names for the image."""
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         image = self._metadata.images[0]
         return [c.name for c in image.pixels.channels]
@@ -374,7 +374,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
             Units per pixel, Units (i.e. "cm" or "mm")
         """
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return (
             self._metadata.images[0].pixels.physical_size_x,
@@ -402,7 +402,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
             Units per pixel, Units (i.e. "cm" or "mm")
         """
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return (
             self._metadata.images[0].pixels.physical_size_y,
@@ -430,7 +430,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
             Units per pixel, Units (i.e. "cm" or "mm")
         """
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return (
             self._metadata.images[0].pixels.physical_size_z,
@@ -520,7 +520,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def dtype(self) -> numpy.dtype:
         """The numpy pixel type of the data."""
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         dtype = numpy.dtype(self._DTYPE[self._metadata.images[0].pixels.type.value])
         return dtype.newbyteorder(
@@ -544,7 +544,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def samples_per_pixel(self) -> int:
         """Number of samples per pixel."""
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return self._metadata.images[0].pixels.channels[0].samples_per_pixel
 
@@ -557,7 +557,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def spp(self):
         """Same as :attr:`.samples_per_pixel`."""
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return self.samples_per_pixel
 
@@ -569,7 +569,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def bytes_per_pixel(self) -> int:
         """Number of bytes per pixel."""
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return self._BPP[self._metadata.images[0].pixels.type.value]
 
@@ -581,7 +581,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def bpp(self):
         """Same as :attr:`.bytes_per_pixel`."""
         if self._metadata is None:
-            self.read_metadata()
+            self._metadata = self._backend.read_metadata()
 
         return self.bytes_per_pixel
 

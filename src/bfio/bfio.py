@@ -329,7 +329,9 @@ class BioReader(BioBase):
         C = self._val_ct(C, "C")
         T = self._val_ct(T, "T")
         if self._backend_name == "tensorstore":
-            return self._backend.read_image(X,Y,Z,C,T)
+            output = self._backend.read_image(X,Y,Z,C,T)
+            # (T, C, Z, Y, X) => (Y, X, Z, C, T)
+            return output.transpose(3, 4, 0, 1, 2).squeeze()
         else:
 
             # Define tile bounds
