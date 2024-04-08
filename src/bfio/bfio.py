@@ -331,7 +331,11 @@ class BioReader(BioBase):
         if self._backend_name == "tensorstore":
             output = self._backend.read_image(X,Y,Z,C,T)
             # (T, C, Z, Y, X) => (Y, X, Z, C, T)
-            return output.transpose(3, 4, 0, 1, 2).squeeze()
+            output = output.transpose(3, 4, 0, 1, 2)
+            
+            while output.shape[-1] == 1 and output.ndim > 2:
+                output = output[..., 0]
+            return output
         else:
 
             # Define tile bounds
