@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import abc
+import multiprocessing
 import numpy
 import ome_types
 import threading
@@ -106,6 +107,15 @@ class BioBase(object, metaclass=abc.ABCMeta):
         if isinstance(file_path, str):
             file_path = Path(file_path)
         self._file_path = file_path
+
+        self._max_workers = (
+            max_workers
+            if max_workers is not None
+            else max([multiprocessing.cpu_count() // 2, 1])
+        )
+
+        # Create an thread lock for the object
+        self._lock = threading.Lock()
 
     def __setitem__(self, keys: typing.Union[list, tuple], values: numpy.ndarray):
         raise NotImplementedError(
