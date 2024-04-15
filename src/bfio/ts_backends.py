@@ -1,28 +1,18 @@
 # -*- coding: utf-8 -*-
 # import core packages
-import copy
-import io
 import logging
-import shutil
-import struct
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
-from typing import Dict, Optional, List, Tuple
-import threading
-from time import time
+from typing import Dict
+
+
 # Third party packages
-import tifffile
-import imagecodecs
-import numpy
 import ome_types
-import re
 from xml.etree import ElementTree as ET
-from xsdata.utils.dates import DateTimeParser
 
 
 from bfiocpp import TSTiffReader, Seq
 import bfio.base_classes
 from bfio.utils import clean_ome_xml_for_known_issues
+
 
 class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
     logger = logging.getLogger("bfio.backends.TsOmeTiffReader")
@@ -47,7 +37,6 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
         # do test for interleaved images
 
         # do test for dimension order
-
 
     def __getstate__(self) -> Dict:
         state_dict = {n: getattr(self, n) for n in self._STATE_DICT}
@@ -82,13 +71,11 @@ class TsOmeTiffReader(bfio.base_classes.TSAbstractReader):
 
         return self._metadata
 
-
-
     def read_image(self, X, Y, Z, C, T):
 
-        cols = Seq(X[0], X[-1]-1, 1)
-        rows = Seq(Y[0], Y[-1]-1, 1)
-        layers = Seq(Z[0], Z[-1]-1, 1)
+        cols = Seq(X[0], X[-1] - 1, 1)
+        rows = Seq(Y[0], Y[-1] - 1, 1)
+        layers = Seq(Z[0], Z[-1] - 1, 1)
         if len(C) == 1:
             channels = Seq(C[0], C[0], 1)
         else:

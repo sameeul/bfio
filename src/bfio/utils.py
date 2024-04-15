@@ -3,7 +3,7 @@
 import scyjava
 import copy
 import logging
-from typing import Dict, Optional, List, Tuple
+from typing import Optional
 
 # Third party packages
 import re
@@ -54,6 +54,7 @@ except ModuleNotFoundError:
 
     def start():  # NOQA: D103
         raise ModuleNotFoundError("Error importing jpype or a loci_tools.jar class.")
+
 
 def clean_ome_xml_for_known_issues(xml: str) -> str:
     """Clean an OME XML string.

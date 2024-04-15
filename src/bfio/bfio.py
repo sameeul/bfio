@@ -134,18 +134,30 @@ class BioReader(BioBase):
                     + "To change back, set the object property."
                 )
         else:
-            raise ValueError('backend must be "python", "bioformats", "tensorstore" or "zarr"')
+            raise ValueError(
+                'backend must be "python", "bioformats", "tensorstore" or "zarr"'
+            )
         self.logger.debug("Finished initializing the backend.")
 
-   
         # Get dims to speed up validation checks
         if self._backend_name == "tensorstore":
-            self._DIMS = {"X": self._backend.X, "Y": self._backend.Y, "Z": self._backend.Z, "C": self._backend.C, "T": self._backend.T}
+            self._DIMS = {
+                "X": self._backend.X,
+                "Y": self._backend.Y,
+                "Z": self._backend.Z,
+                "C": self._backend.C,
+                "T": self._backend.T,
+            }
         else:
             # Preload the metadata
             self._metadata = self._backend.read_metadata()
-            self._DIMS = {"X": self.X, "Y": self.Y, "Z": self.Z, "C": self.C, "T": self.T}
-
+            self._DIMS = {
+                "X": self.X,
+                "Y": self.Y,
+                "Z": self.Z,
+                "C": self.C,
+                "T": self.T,
+            }
 
     def python_backend_support(self, filename: str):
         with tifffile.TiffFile(filename) as tif:
@@ -186,10 +198,11 @@ class BioReader(BioBase):
             "python",
             "bioformats",
             "zarr",
-            "tensorstore"
+            "tensorstore",
         ]:
             raise ValueError(
-                'Keyword argument backend must be one of ["python","bioformats","zarr", "tensorstore"]'
+                "Keyword argument backend must be one of"
+                + '["python", "bioformats", "zarr", "tensorstore"]'
             )
 
         # if backend not given, set backend
@@ -329,10 +342,10 @@ class BioReader(BioBase):
         C = self._val_ct(C, "C")
         T = self._val_ct(T, "T")
         if self._backend_name == "tensorstore":
-            output = self._backend.read_image(X,Y,Z,C,T)
+            output = self._backend.read_image(X, Y, Z, C, T)
             # (T, C, Z, Y, X) => (Y, X, Z, C, T)
             output = output.transpose(3, 4, 0, 1, 2)
-            
+
             while output.shape[-1] == 1 and output.ndim > 2:
                 output = output[..., 0]
             return output
@@ -341,8 +354,12 @@ class BioReader(BioBase):
             # Define tile bounds
             X_tile_start = (X[0] // self._TILE_SIZE) * self._TILE_SIZE
             Y_tile_start = (Y[0] // self._TILE_SIZE) * self._TILE_SIZE
-            X_tile_end = numpy.ceil(X[1] / self._TILE_SIZE).astype(int) * self._TILE_SIZE
-            Y_tile_end = numpy.ceil(Y[1] / self._TILE_SIZE).astype(int) * self._TILE_SIZE
+            X_tile_end = (
+                numpy.ceil(X[1] / self._TILE_SIZE).astype(int) * self._TILE_SIZE
+            )
+            Y_tile_end = (
+                numpy.ceil(Y[1] / self._TILE_SIZE).astype(int) * self._TILE_SIZE
+            )
             X_tile_shape = X_tile_end - X_tile_start
             Y_tile_shape = Y_tile_end - Y_tile_start
             Z_tile_shape = Z[1] - Z[0]
@@ -363,8 +380,10 @@ class BioReader(BioBase):
                 )
 
             # Initialize the output for python
-            # We use a different matrix shape for loading images to reduce memory copy time
-            # TODO: Should use this same scheme for the other readers to reduce copy times
+            # We use a different matrix shape for loading images to reduce memory
+            # copy time
+            # TODO: Should use this same scheme for the other readers to reduce
+            # copy times
             else:
                 if load_tiles:
                     y_tile = self._TILE_SIZE
@@ -685,8 +704,20 @@ class BioReader(BioBase):
 
             self._backend._rdr.send_iter_read_request(tile_size, tile_stride)
             for data in self._backend._rdr._image_reader.__iter__():
-                row_index, col_index = self._backend._rdr._image_reader.get_tile_coordinate(data[3], data[5], tile_size[0],  tile_size[1])
-                yield (data[0], data[1], data[2], row_index, col_index), self._backend._rdr._image_reader.get_iterator_requested_tile_data(data[0], data[1], data[2], data[3], data[4], data[5], data[6])
+                row_index, col_index = (
+                    self._backend._rdr._image_reader.get_tile_coordinate(
+                        data[3], data[5], tile_size[0], tile_size[1]
+                    )
+                )
+                yield (
+                    data[0],
+                    data[1],
+                    data[2],
+                    row_index,
+                    col_index,
+                ), self._backend._rdr._image_reader.get_iterator_requested_tile_data(
+                    data[0], data[1], data[2], data[3], data[4], data[5], data[6]
+                )
         else:
             # Ensure that the number of tiles does not exceed the supertile width
             if batch_size is None:
@@ -697,8 +728,6 @@ class BioReader(BioBase):
                 ), "batch_size must be less than or equal to {}.".format(
                     self.maximum_batch_size(tile_size, tile_stride)
                 )
-
-
 
             # calculate padding if needed
             if not (set(tile_size) & set(tile_stride)):
@@ -711,10 +740,12 @@ class BioReader(BioBase):
                     (tile_size[1] - tile_stride[1]) / 2,
                 ]
                 xypad[0] = (
-                    xyoffset[0] + (tile_stride[0] - numpy.mod(self.Y, tile_stride[0])) / 2
+                    xyoffset[0]
+                    + (tile_stride[0] - numpy.mod(self.Y, tile_stride[0])) / 2
                 )
                 xypad[1] = (
-                    xyoffset[1] + (tile_stride[1] - numpy.mod(self.X, tile_stride[1])) / 2
+                    xyoffset[1]
+                    + (tile_stride[1] - numpy.mod(self.X, tile_stride[1])) / 2
                 )
                 xypad = (
                     (int(xyoffset[0]), int(2 * xypad[0] - xyoffset[0])),
@@ -744,12 +775,16 @@ class BioReader(BioBase):
 
             # Generate the supertile loading order
             tiles = []
-            y_tile_list = list(range(0, self.Y + xypad[0][1], self._TILE_SIZE * y_tile_dim))
+            y_tile_list = list(
+                range(0, self.Y + xypad[0][1], self._TILE_SIZE * y_tile_dim)
+            )
             if y_tile_list[-1] != self._TILE_SIZE * y_tile_dim:
                 y_tile_list.append(self._TILE_SIZE * y_tile_dim)
             if y_tile_list[0] != xypad[0][0]:
                 y_tile_list[0] = -xypad[0][0]
-            x_tile_list = list(range(0, self.X + xypad[1][1], self._TILE_SIZE * x_tile_dim))
+            x_tile_list = list(
+                range(0, self.X + xypad[1][1], self._TILE_SIZE * x_tile_dim)
+            )
             if x_tile_list[-1] < self.X + xypad[1][1]:
                 x_tile_list.append(x_tile_list[-1] + self._TILE_SIZE)
             if x_tile_list[0] != xypad[1][0]:
@@ -799,7 +834,10 @@ class BioReader(BioBase):
                 )
 
                 # Load another supertile if possible
-                if self._supertile_index.qsize() > 0 and not self._fetch_thread.running():
+                if (
+                    self._supertile_index.qsize() > 0
+                    and not self._fetch_thread.running()
+                ):
                     self._fetch_thread = thread_pool.submit(self._fetch)
 
                 # return the current set of images

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import abc
-import multiprocessing
 import numpy
 import ome_types
 import threading
@@ -107,8 +106,6 @@ class BioBase(object, metaclass=abc.ABCMeta):
         if isinstance(file_path, str):
             file_path = Path(file_path)
         self._file_path = file_path
-
-
 
     def __setitem__(self, keys: typing.Union[list, tuple], values: numpy.ndarray):
         raise NotImplementedError(
@@ -820,6 +817,7 @@ class AbstractWriter(AbstractBackend):  # NOQA: D101
     def _write_image(*args):
         pass
 
+
 class TSAbstractBackend(object, metaclass=abc.ABCMeta):
     """Base class for backend readers/writers."""
 
@@ -831,7 +829,6 @@ class TSAbstractBackend(object, metaclass=abc.ABCMeta):
             frontend (BioBase): The BioBase object associated with the backend.
         """
         self.frontend = frontend
-
 
     @abc.abstractmethod
     def close(self):
@@ -867,8 +864,8 @@ class TSAbstractReader(TSAbstractBackend):
         Subclasses must override this to properly retrieve and format the data.
         """
         pass
+
     @abc.abstractmethod
     def read_image(self, *args):
-        """Abstract read image executor.
-        """
+        """Abstract read image executor."""
         pass

@@ -888,7 +888,7 @@ try:
 
         def _load_java_classes(self):
             if not jpype.isJVMStarted():
-                bfio.utils.start()
+                start()
 
             global ImageReader
             from loci.formats import ImageReader
@@ -1029,7 +1029,7 @@ try:
 
         def _load_java_classes(self):
             if not jpype.isJVMStarted():
-                bfio.utils.start()
+                start()
 
             global OMETiffWriter
             from loci.formats.out import OMETiffWriter
