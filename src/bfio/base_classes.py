@@ -89,6 +89,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
     def __init__(
         self,
         file_path: typing.Union[str, Path],
+        max_workers: typing.Optional[int] = None,
         read_only: typing.Optional[bool] = True,
     ):
         """Initialize BioBase object.

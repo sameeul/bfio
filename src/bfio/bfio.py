@@ -5,8 +5,6 @@ import struct
 import typing
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import threading
-import multiprocessing
 import numpy
 import ome_types
 import tifffile
@@ -80,17 +78,11 @@ class BioReader(BioBase):
                 image type, this will be ignored
         """
         # Initialize BioBase
-        super(BioReader, self).__init__(file_path)
+        super(BioReader, self).__init__(file_path, max_workers=max_workers)
 
-        if backend != "tensorstore":
-            self._max_workers = (
-                max_workers
-                if max_workers is not None
-                else max([multiprocessing.cpu_count() // 2, 1])
-            )
-
-            # Create an thread lock for the object
-            self._lock = threading.Lock()
+        if backend == "tensorstore":
+            # Tensorstore does not use Python's threading model
+            self._lock = None
 
         self.clean_metadata = clean_metadata
         self.set_backend(backend)
@@ -1038,17 +1030,10 @@ class BioWriter(BioBase):
         """
         super(BioWriter, self).__init__(
             file_path=file_path,
+            max_workers=max_workers,
             read_only=False,
         )
 
-        self._max_workers = (
-            max_workers
-            if max_workers is not None
-            else max([multiprocessing.cpu_count() // 2, 1])
-        )
-
-        # Create an thread lock for the object
-        self._lock = threading.Lock()
         if metadata:
             assert metadata.__class__.__name__ == "OME"
             self._metadata = metadata.model_copy(deep=True)
@@ -1136,7 +1121,6 @@ class BioWriter(BioBase):
             "python",
             "bioformats",
             "zarr",
-            "tensorstore",
         ]:
             raise ValueError(
                 'Keyword argument backend must be one of ["python","bioformats","zarr"]'
