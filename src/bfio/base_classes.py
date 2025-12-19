@@ -107,7 +107,7 @@ class BioBase(object, metaclass=abc.ABCMeta):
         # Internally, keep the file_path as a Path object
         if isinstance(file_path, str):
             file_path = Path(file_path)
-        self._file_path = file_path
+        self._file_path = file_path.expanduser().resolve()
 
         self._max_workers = (
             max_workers
