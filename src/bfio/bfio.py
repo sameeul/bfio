@@ -13,6 +13,7 @@ import tifffile
 from bfio import backends
 from bfio.base_classes import BioBase
 from bfio.ts_backends import TensorstoreReader, TensorstoreWriter
+from bfio.utils import detect_zarr_format
 
 
 class BioReader(BioBase):
@@ -125,9 +126,17 @@ class BioReader(BioBase):
                     "Setting max_workers to 1, since max_workers==2 runs slower."
                     + "To change back, set the object property."
                 )
+        elif self._backend_name == "zarr3":
+            self._backend = backends.Zarr3Reader(self)
+            if self._max_workers == 2:
+                self._max_workers = 1
+                self.logger.debug(
+                    "Setting max_workers to 1, since max_workers==2 runs slower."
+                    + "To change back, set the object property."
+                )
         else:
             raise ValueError(
-                'backend must be "python", "bioformats", "tensorstore" or "zarr"'
+                'backend must be "python", "bioformats", "tensorstore", "zarr", or "zarr3"'
             )
         self.logger.debug("Finished initializing the backend.")
 
@@ -180,6 +189,9 @@ class BioReader(BioBase):
                 )
                 return "bioformats"
             else:
+                fmt = detect_zarr_format(self._file_path)
+                if fmt == 3:
+                    return "zarr3"
                 return "zarr"
         else:
             return "bioformats"
@@ -190,11 +202,12 @@ class BioReader(BioBase):
             "python",
             "bioformats",
             "zarr",
+            "zarr3",
             "tensorstore",
         ]:
             raise ValueError(
                 "Keyword argument backend must be one of"
-                + '["python", "bioformats", "zarr", "tensorstore"]'
+                + '["python", "bioformats", "zarr", "zarr3", "tensorstore"]'
             )
 
         # if backend not given, set backend
@@ -226,6 +239,15 @@ class BioReader(BioBase):
             if not Path.is_dir(self._file_path):
                 self.logger.warning(
                     "Zarr backend is selected but the path is not a directory,"
+                    + " switching to bioformats backend."
+                )
+                backend = self.auto_select_backend(self._file_path)
+
+        elif backend == "zarr3":
+            # make sure it is a directory
+            if not Path.is_dir(self._file_path):
+                self.logger.warning(
+                    "Zarr3 backend is selected but the path is not a directory,"
                     + " switching to bioformats backend."
                 )
                 backend = self.auto_select_backend(self._file_path)
@@ -895,6 +917,18 @@ class BioReader(BioBase):
 
         # Handle a zarr file
         if filepath.name.endswith(".zarr"):
+            # Check for zarr v3 format (zarr.json)
+            zarr_json_path = find_file_recursive(filepath, "zarr.json")
+            if zarr_json_path is not None:
+                with open(zarr_json_path, "r") as fr:
+                    zarr_meta = json.load(fr)
+                    if zarr_meta.get("node_type") == "array" and "shape" in zarr_meta:
+                        shape = zarr_meta["shape"]
+                        height = shape[3]
+                        width = shape[4]
+                        return width, height
+
+            # Check for zarr v2 format (.zarray)
             zarray_path = find_file_recursive(filepath, ".zarray")
             if zarray_path is not None:
                 with open(zarray_path, "r") as fr:
@@ -1127,8 +1161,18 @@ class BioWriter(BioBase):
                     "Setting max_workers to 1, since max_workers==2 runs slower."
                     + "To change back, set the object property."
                 )
+        elif self._backend_name == "zarr3":
+            self._backend = backends.Zarr3Writer(self)
+            if self._max_workers == 2:
+                self._max_workers = 1
+                self.logger.debug(
+                    "Setting max_workers to 1, since max_workers==2 runs slower."
+                    + "To change back, set the object property."
+                )
         else:
-            raise ValueError('backend must be "python", "bioformats", or "zarr"')
+            raise ValueError(
+                'backend must be "python", "bioformats", "tensorstore", "zarr", or "zarr3"'
+            )
 
         if not self._file_path.name.endswith(
             ".ome.tif"
@@ -1154,11 +1198,12 @@ class BioWriter(BioBase):
             "python",
             "bioformats",
             "zarr",
+            "zarr3",
             "tensorstore",
         ]:
             raise ValueError(
                 "Keyword argument backend must be one of "
-                + '["python","bioformats","zarr","tensorstore"]'
+                + '["python","bioformats","zarr","zarr3","tensorstore"]'
             )
         if backend == "python":
             extension = "".join(self._file_path.suffixes)
@@ -1178,6 +1223,15 @@ class BioWriter(BioBase):
                 )
                 backend = "bioformats"
 
+        if backend == "zarr3":
+            # make sure we can create a directory
+            if Path.exists(self._file_path) and Path.is_file(self._file_path):
+                self.logger.warning(
+                    "Zarr3 backend is selected but a file with same pathname exist,"
+                    + " switching to bioformats backend."
+                )
+                backend = "bioformats"
+
         if backend is None:
             extension = "".join(self._file_path.suffixes)
             if extension.endswith(".ome.tif") or extension.endswith(".ome.tiff"):
@@ -1191,7 +1245,15 @@ class BioWriter(BioBase):
                     )
                     backend = "bioformats"
                 else:
-                    backend = "zarr"
+                    # Auto-detect format for existing stores
+                    if Path.exists(self._file_path):
+                        fmt = detect_zarr_format(self._file_path)
+                        if fmt == 3:
+                            backend = "zarr3"
+                        else:
+                            backend = "zarr"
+                    else:
+                        backend = "zarr"
             else:
                 backend = "bioformats"
 

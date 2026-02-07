@@ -65,6 +65,18 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         self.T = self._rdr._T
         self.data_type = self._rdr._datatype
 
+    def _list_zarr_children(self, path, child_type="array"):
+        """Filesystem-based fallback for enumerating zarr v2 store children."""
+        from pathlib import Path as _Path
+        p = _Path(path)
+        marker = ".zarray" if child_type == "array" else ".zgroup"
+        children = []
+        if p.is_dir():
+            for child in p.iterdir():
+                if child.is_dir() and (child / marker).exists():
+                    children.append(child.name)
+        return sorted(children)
+
     def get_zarr_array_info(self):
         self.logger.debug(f"Level is {self.frontend.level}")
 
@@ -72,20 +84,21 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         root_path = self.frontend._file_path
         try:
             root = zarr.open(str(root_path.resolve()), mode="r")
-        except zarr.errors.PathNotFoundError:
+        except (FileNotFoundError, KeyError):
             # a workaround for pre-compute slide output directory structure
             root_path = self.frontend._file_path / "data.zarr"
             root = zarr.open(root_path.resolve(), mode="r")
 
         axes_list = ""
+        store_path = str(root_path.resolve())
         if self.frontend.level is None:
-            if isinstance(root, zarr.core.Array):
+            if isinstance(root, zarr.Array):
                 return str(root_path.resolve()), axes_list
-            elif isinstance(root, zarr.hierarchy.Group):
+            elif isinstance(root, zarr.Group):
                 #  the top level is a group, check if this has any arrays
-                num_arrays = len(sorted(root.array_keys()))
-                if num_arrays > 0:
-                    array_key = next(root.array_keys())
+                array_keys = self._list_zarr_children(store_path, "array")
+                if len(array_keys) > 0:
+                    array_key = array_keys[0]
                     root_path = root_path / str(array_key)
                     try:
                         axes_metadata = root.attrs["multiscales"][0]["axes"]
@@ -101,7 +114,8 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                     return str(root_path.resolve()), axes_list
                 else:
                     # need to go one more level
-                    group_key = next(root.group_keys())
+                    group_keys = self._list_zarr_children(store_path, "group")
+                    group_key = group_keys[0]
                     root = root[group_key]
                     try:
                         axes_metadata = root.attrs["multiscales"][0]["axes"]
@@ -114,20 +128,23 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                             + "dimensions might be incorrect."
                         )
 
-                    array_key = next(root.array_keys())
+                    sub_path = str(Path(store_path) / group_key)
+                    sub_array_keys = self._list_zarr_children(sub_path, "array")
+                    array_key = sub_array_keys[0]
                     root_path = root_path / str(group_key) / str(array_key)
                     return str(root_path.resolve()), axes_list
             else:
                 return str(root_path.resolve()), axes_list
         else:
-            if isinstance(root, zarr.core.Array):
+            if isinstance(root, zarr.Array):
                 self.close()
                 raise ValueError(
                     "Level is specified but the zarr file does not contain "
                     + "multiple resoulutions."
                 )
-            elif isinstance(root, zarr.hierarchy.Group):
-                if len(sorted(root.array_keys())) > self.frontend.level:
+            elif isinstance(root, zarr.Group):
+                array_keys = self._list_zarr_children(store_path, "array")
+                if len(array_keys) > self.frontend.level:
                     root_path = root_path / str(self.frontend.level)
                     try:
                         axes_metadata = root.attrs["multiscales"][0]["axes"]
@@ -367,7 +384,12 @@ class TensorstoreWriter(bfio.base_classes.TSAbstractWriter):
 
         # This is recommended to do for cloud storage to increase read/write
         # speed, but it also increases write speed locally when threading.
-        zarr.consolidate_metadata(str(self.frontend._file_path.resolve()))
+        try:
+            zarr.consolidate_metadata(str(self.frontend._file_path.resolve()))
+        except Exception:
+            self.logger.debug(
+                "Could not consolidate zarr metadata, continuing without it."
+            )
 
     def write_image(self, X, Y, Z, C, T, image):
 
