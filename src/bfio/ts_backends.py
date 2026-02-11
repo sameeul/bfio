@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict
 import shutil
 
-
 # Third party packages
 import ome_types
 from xml.etree import ElementTree as ET

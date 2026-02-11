@@ -16,7 +16,6 @@ import ome_types
 from tifffile import tifffile
 from xml.etree import ElementTree as ET
 
-
 # bfio internals
 from bfio import __version__ as version
 import bfio.base_classes
