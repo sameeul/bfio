@@ -61,6 +61,7 @@ def setUpModule():
             shape=(1, br.C, br.Z, br.Y, br.X),
             dtype=br.dtype,
             chunks=(1, 1, 1, 1024, 1024),
+            zarr_format=2,
         )
         for t in range(1):
             for c in range(br.C):
@@ -129,7 +130,7 @@ class TestSimpleRead(unittest.TestCase):
     def test_read_zarr_auto(self):
         """test_read_zarr_auto - Read ome zarr, should load zarr backend"""
         with bfio.BioReader(TEST_DIR.joinpath("4d_array.zarr")) as br:
-            self.assertEqual(br._backend_name, "zarr3")
+            self.assertEqual(br._backend_name, "zarr")
 
             I = br[:]
 
