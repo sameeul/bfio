@@ -1285,7 +1285,7 @@ try:
                 elif isinstance(self._root, zarr.Group):
                     array_keys = _list_zarr_children(store_path, "array")
                     if len(array_keys) > self.frontend.level:
-                        self._rdr = self._root[self.frontend.level]
+                        self._rdr = self._root[str(self.frontend.level)]
                     else:
                         raise ValueError(
                             "The zarr file does not contain resolution "
@@ -1646,7 +1646,7 @@ try:
                         k for k, v in self._root.members() if isinstance(v, zarr.Array)
                     )
                     if len(array_names) > self.frontend.level:
-                        self._rdr = self._root[self.frontend.level]
+                        self._rdr = self._root[str(self.frontend.level)]
                     else:
                         raise ValueError(
                             "The zarr file does not contain resolution "
