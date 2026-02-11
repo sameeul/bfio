@@ -23,12 +23,13 @@ class BioReader(BioBase):
     any Bio-Formats supported file format, but is specially optimized for
     handling the OME tiled tiff format.
 
-    There are three backends: ``bioformats``, ``python``, and ``zarr``. The
-    ``bioformats`` backend directly uses Bio-Formats for file reading, and can read any
-    forma that is supported by Bio-Formats. The ``python`` backend will only read
-    images in OME Tiff format with tile tags set to 1024x1024, and is
-    significantly faster than the "bioformats" backend for reading these types of tiff
-    files. The ``zarr`` backend will only read OME Zarr files.
+    There are five backends: ``bioformats``, ``python``, ``zarr``, ``zarr3``, and
+    ``tensorstore``. The ``bioformats`` backend directly uses Bio-Formats for file
+    reading, and can read any format that is supported by Bio-Formats.
+    The ``python`` backend will only read images in OME Tiff format with tile tags
+    set to 1024x1024, and is significantly faster than the "bioformats" backend for
+    reading these types of tiff files. The ``zarr`` backend will only read OME Zarr
+    files.
 
     File reading and writing are multi-threaded by default, except for the
     ``bioformats`` backend which does not currently support threading. Half of the
@@ -136,7 +137,8 @@ class BioReader(BioBase):
                 )
         else:
             raise ValueError(
-                'backend must be "python", "bioformats", "tensorstore", "zarr", or "zarr3"'
+                'backend must be "python", "bioformats", "tensorstore", "zarr", or '
+                '"zarr3"'
             )
         self.logger.debug("Finished initializing the backend.")
 
@@ -1171,7 +1173,8 @@ class BioWriter(BioBase):
                 )
         else:
             raise ValueError(
-                'backend must be "python", "bioformats", "tensorstore", "zarr", or "zarr3"'
+                'backend must be "python", "bioformats", "tensorstore", "zarr", \
+                 or "zarr3"'
             )
 
         if not self._file_path.name.endswith(

@@ -11,6 +11,7 @@ import zarr
 from ome_zarr.utils import download as zarr_download
 
 TEST_IMAGES = {
+    "ExpA_VIP_ASLM_on.zarr": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0066/ExpA_VIP_ASLM_on.zarr",
     "5025551.zarr": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0054A/5025551.zarr",
     "Plate1-Blue-A-12-Scene-3-P3-F2-03.czi": "https://downloads.openmicroscopy.org/images/Zeiss-CZI/idr0011/Plate1-Blue-A_TS-Stinger/Plate1-Blue-A-12-Scene-3-P3-F2-03.czi",
     "0.tif": "https://osf.io/j6aer/download",
@@ -129,7 +130,7 @@ class TestSimpleRead(unittest.TestCase):
     def test_read_zarr_auto(self):
         """test_read_zarr_auto - Read ome zarr, should load zarr backend"""
         with bfio.BioReader(TEST_DIR.joinpath("4d_array.zarr")) as br:
-            self.assertEqual(br._backend_name, "zarr")
+            self.assertEqual(br._backend_name, "zarr3")
 
             I = br[:]
 

@@ -73,9 +73,7 @@ class TestZarr3Writer(unittest.TestCase):
             out_path = Path(tmp) / "output.zarr"
             data = numpy.random.randint(0, 255, (128, 128), dtype=numpy.uint8)
 
-            bw = BioWriter(
-                out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8)
             bw[:128, :128, 0, 0, 0] = data
             bw.close()
 
@@ -92,9 +90,7 @@ class TestZarr3Writer(unittest.TestCase):
             out_path = Path(tmp) / "output.zarr"
             data = numpy.random.randint(0, 255, (128, 128), dtype=numpy.uint8)
 
-            bw = BioWriter(
-                out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8)
             bw[:128, :128, 0, 0, 0] = data
             bw.close()
 
@@ -113,9 +109,7 @@ class TestZarr3Reader(unittest.TestCase):
             out_path = Path(tmp) / "output.zarr"
             data = numpy.random.randint(0, 255, (128, 128), dtype=numpy.uint8)
 
-            bw = BioWriter(
-                out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8)
             bw[:128, :128, 0, 0, 0] = data
             bw.close()
 
@@ -165,9 +159,7 @@ class TestZarrAutoBackendSelection(unittest.TestCase):
             out_path = Path(tmp) / "output_v2.zarr"
             data = numpy.random.randint(0, 255, (128, 128), dtype=numpy.uint8)
 
-            bw = BioWriter(
-                out_path, backend="zarr", X=128, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr", X=128, Y=128, dtype=numpy.uint8)
             bw[:128, :128, 0, 0, 0] = data
             bw.close()
 
@@ -183,9 +175,7 @@ class TestZarrAutoBackendSelection(unittest.TestCase):
             out_path = Path(tmp) / "output_v3.zarr"
             data = numpy.random.randint(0, 255, (128, 128), dtype=numpy.uint8)
 
-            bw = BioWriter(
-                out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8)
             bw[:128, :128, 0, 0, 0] = data
             bw.close()
 
@@ -205,9 +195,7 @@ class TestZarrRoundTrip(unittest.TestCase):
             out_path = Path(tmp) / "roundtrip_zarr.zarr"
             data = numpy.random.randint(0, 65535, (64, 64), dtype=numpy.uint16)
 
-            bw = BioWriter(
-                out_path, backend="zarr", X=64, Y=64, dtype=numpy.uint16
-            )
+            bw = BioWriter(out_path, backend="zarr", X=64, Y=64, dtype=numpy.uint16)
             bw[:64, :64, 0, 0, 0] = data
             bw.close()
 
@@ -225,9 +213,7 @@ class TestZarrRoundTrip(unittest.TestCase):
             out_path = Path(tmp) / "roundtrip_zarr3.zarr"
             data = numpy.random.randint(0, 65535, (64, 64), dtype=numpy.uint16)
 
-            bw = BioWriter(
-                out_path, backend="zarr3", X=64, Y=64, dtype=numpy.uint16
-            )
+            bw = BioWriter(out_path, backend="zarr3", X=64, Y=64, dtype=numpy.uint16)
             bw[:64, :64, 0, 0, 0] = data
             bw.close()
 
@@ -247,9 +233,7 @@ class TestImageSizeV3(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out_path = Path(tmp) / "size_test.zarr"
-            bw = BioWriter(
-                out_path, backend="zarr3", X=256, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr3", X=256, Y=128, dtype=numpy.uint8)
             data = numpy.zeros((128, 256, 1, 1, 1), dtype=numpy.uint8)
             bw.write(data)
             bw.close()
@@ -264,9 +248,7 @@ class TestImageSizeV3(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out_path = Path(tmp) / "size_test_v2.zarr"
-            bw = BioWriter(
-                out_path, backend="zarr", X=256, Y=128, dtype=numpy.uint8
-            )
+            bw = BioWriter(out_path, backend="zarr", X=256, Y=128, dtype=numpy.uint8)
             data = numpy.zeros((128, 256, 1, 1, 1), dtype=numpy.uint8)
             bw.write(data)
             bw.close()

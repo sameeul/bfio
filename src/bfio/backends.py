@@ -20,7 +20,11 @@ from xml.etree import ElementTree as ET
 # bfio internals
 from bfio import __version__ as version
 import bfio.base_classes
-from bfio.utils import start, clean_ome_xml_for_known_issues, pixels_per_cm, detect_zarr_format
+from bfio.utils import (
+    start,
+    clean_ome_xml_for_known_issues,
+    pixels_per_cm,
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)-8s - %(levelname)-8s - %(message)s",
@@ -1612,19 +1616,20 @@ try:
                 elif isinstance(self._root, zarr.Group):
                     # Use native v3 group enumeration
                     array_names = sorted(
-                        k for k, v in self._root.members()
-                        if isinstance(v, zarr.Array)
+                        k for k, v in self._root.members() if isinstance(v, zarr.Array)
                     )
                     if len(array_names) > 0:
                         self._rdr = self._root[array_names[0]]
                     else:
                         group_names = sorted(
-                            k for k, v in self._root.members()
+                            k
+                            for k, v in self._root.members()
                             if isinstance(v, zarr.Group)
                         )
                         self._root = self._root[group_names[0]]
                         array_names = sorted(
-                            k for k, v in self._root.members()
+                            k
+                            for k, v in self._root.members()
                             if isinstance(v, zarr.Array)
                         )
                         self._rdr = self._root[array_names[0]]
@@ -1639,8 +1644,7 @@ try:
                     )
                 elif isinstance(self._root, zarr.Group):
                     array_names = sorted(
-                        k for k, v in self._root.members()
-                        if isinstance(v, zarr.Array)
+                        k for k, v in self._root.members() if isinstance(v, zarr.Array)
                     )
                     if len(array_names) > self.frontend.level:
                         self._rdr = self._root[self.frontend.level]
@@ -1748,8 +1752,7 @@ try:
             # Check for existing arrays when appending
             if self.frontend.append is True:
                 existing_arrays = sorted(
-                    k for k, v in self._root.members()
-                    if isinstance(v, zarr.Array)
+                    k for k, v in self._root.members() if isinstance(v, zarr.Array)
                 )
                 if len(existing_arrays) > 0:
                     writer = self._root["0"]
@@ -1796,12 +1799,8 @@ except ModuleNotFoundError:
 
     class Zarr3Reader(bfio.base_classes.AbstractReader):
         def __init__(self, frontend):
-            raise ImportError(
-                "Zarr3Reader class unavailable. Could not import zarr."
-            )
+            raise ImportError("Zarr3Reader class unavailable. Could not import zarr.")
 
     class Zarr3Writer(bfio.base_classes.AbstractWriter):
         def __init__(self, frontend):
-            raise ImportError(
-                "Zarr3Writer class unavailable. Could not import zarr."
-            )
+            raise ImportError("Zarr3Writer class unavailable. Could not import zarr.")

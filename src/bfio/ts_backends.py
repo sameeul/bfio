@@ -55,7 +55,7 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                 )
             else:
                 self._file_path, self._axes_list = self.get_zarr_array_info()
-                self._file_type = FileType.OmeZarr
+                self._file_type = FileType.OmeZarrV2
 
         self._rdr = TSReader(self._file_path, self._file_type, self._axes_list)
         self.X = self._rdr._X
@@ -68,6 +68,7 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
     def _list_zarr_children(self, path, child_type="array"):
         """Filesystem-based fallback for enumerating zarr v2 store children."""
         from pathlib import Path as _Path
+
         p = _Path(path)
         marker = ".zarray" if child_type == "array" else ".zgroup"
         children = []
@@ -184,7 +185,7 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         self.logger.debug("read_metadata(): Reading metadata...")
         if self._file_type == FileType.OmeTiff:
             return self.read_tiff_metadata()
-        if self._file_type == FileType.OmeZarr:
+        if self._file_type == FileType.OmeZarrV2:
             return self.read_zarr_metadata()
 
     def read_image(self, X, Y, Z, C, T):
