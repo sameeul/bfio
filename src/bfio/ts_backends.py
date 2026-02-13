@@ -13,7 +13,7 @@ from xml.etree import ElementTree as ET
 
 from bfiocpp import TSReader, TSWriter, Seq, FileType, get_ome_xml
 import bfio.base_classes
-from bfio.utils import clean_ome_xml_for_known_issues
+from bfio.utils import clean_ome_xml_for_known_issues, detect_zarr_format
 import zarr
 
 
@@ -54,7 +54,13 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                 )
             else:
                 self._file_path, self._axes_list = self.get_zarr_array_info()
-                self._file_type = FileType.OmeZarrV2
+                # Detect zarr format and set appropriate FileType
+                zarr_format = detect_zarr_format(self.frontend._file_path)
+                if zarr_format == 3:
+                    self._file_type = FileType.OmeZarrV3
+                else:
+                    # Default to v2 for v2 format or unknown
+                    self._file_type = FileType.OmeZarrV2
 
         self._rdr = TSReader(self._file_path, self._file_type, self._axes_list)
         self.X = self._rdr._X
@@ -65,7 +71,13 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         self.data_type = self._rdr._datatype
 
     def _list_zarr_children(self, path, child_type="array"):
-        """Filesystem-based fallback for enumerating zarr v2 store children."""
+        """Filesystem-based fallback for enumerating zarr v2 store children.
+
+        In zarr-python v3, array_keys()/group_keys() are unreliable for v2 stores.
+        This function checks subdirectories for .zarray or .zgroup marker files.
+
+        NOTE: Only use this for v2 stores. For v3 stores, use root.array_keys()/group_keys().
+        """
         from pathlib import Path as _Path
 
         p = _Path(path)
@@ -76,6 +88,31 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                 if child.is_dir() and (child / marker).exists():
                     children.append(child.name)
         return sorted(children)
+
+    def _get_zarr_children(self, root, root_path, child_type="array", is_v3=False):
+        """Get child arrays or groups using the appropriate method for the zarr format.
+
+        For v2: Uses filesystem fallback (_list_zarr_children)
+        For v3: Uses zarr-python's array_keys()/group_keys() methods
+
+        Args:
+            root: zarr.Group object
+            root_path: Path to the zarr store
+            child_type: "array" or "group"
+            is_v3: True if this is a v3 format store
+
+        Returns:
+            List of child names (sorted)
+        """
+        if is_v3:
+            # For v3, use zarr-python methods which are reliable
+            if child_type == "array":
+                return sorted(list(root.array_keys()))
+            else:
+                return sorted(list(root.group_keys()))
+        else:
+            # For v2, use filesystem fallback
+            return self._list_zarr_children(str(root_path), child_type)
 
     def get_zarr_array_info(self):
         self.logger.debug(f"Level is {self.frontend.level}")
@@ -89,6 +126,10 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
             root_path = self.frontend._file_path / "data.zarr"
             root = zarr.open(root_path.resolve(), mode="r")
 
+        # Detect zarr format to choose appropriate enumeration method
+        zarr_format = detect_zarr_format(root_path)
+        is_v3 = (zarr_format == 3)
+
         axes_list = ""
         store_path = str(root_path.resolve())
         if self.frontend.level is None:
@@ -96,15 +137,24 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                 return str(root_path.resolve()), axes_list
             elif isinstance(root, zarr.Group):
                 #  the top level is a group, check if this has any arrays
-                array_keys = self._list_zarr_children(store_path, "array")
+                array_keys = self._get_zarr_children(root, root_path, "array", is_v3)
                 if len(array_keys) > 0:
                     array_key = array_keys[0]
                     root_path = root_path / str(array_key)
                     try:
-                        axes_metadata = root.attrs["multiscales"][0]["axes"]
-                        axes_list = "".join(
-                            axes["name"].upper() for axes in axes_metadata
-                        )
+                        # Try v3 location first (NGFF 0.5)
+                        ome_meta = root.attrs.get("ome", {})
+                        axes_metadata = ome_meta.get("multiscales", [{}])[0].get("axes")
+                        if axes_metadata:
+                            axes_list = "".join(
+                                axes["name"].upper() for axes in axes_metadata
+                            )
+                        else:
+                            # Fall back to v2 location
+                            axes_metadata = root.attrs["multiscales"][0]["axes"]
+                            axes_list = "".join(
+                                axes["name"].upper() for axes in axes_metadata
+                            )
                     except KeyError:
                         self.logger.warning(
                             "Unable to find multiscales metadata. Z, C and T "
@@ -114,14 +164,23 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                     return str(root_path.resolve()), axes_list
                 else:
                     # need to go one more level
-                    group_keys = self._list_zarr_children(store_path, "group")
+                    group_keys = self._get_zarr_children(root, root_path, "group", is_v3)
                     group_key = group_keys[0]
                     root = root[group_key]
                     try:
-                        axes_metadata = root.attrs["multiscales"][0]["axes"]
-                        axes_list = "".join(
-                            axes["name"].upper() for axes in axes_metadata
-                        )
+                        # Try v3 location first (NGFF 0.5)
+                        ome_meta = root.attrs.get("ome", {})
+                        axes_metadata = ome_meta.get("multiscales", [{}])[0].get("axes")
+                        if axes_metadata:
+                            axes_list = "".join(
+                                axes["name"].upper() for axes in axes_metadata
+                            )
+                        else:
+                            # Fall back to v2 location
+                            axes_metadata = root.attrs["multiscales"][0]["axes"]
+                            axes_list = "".join(
+                                axes["name"].upper() for axes in axes_metadata
+                            )
                     except KeyError:
                         self.logger.warning(
                             "Unable to find multiscales metadata. Z, C and T "
@@ -129,7 +188,7 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                         )
 
                     sub_path = str(Path(store_path) / group_key)
-                    sub_array_keys = self._list_zarr_children(sub_path, "array")
+                    sub_array_keys = self._get_zarr_children(root, Path(sub_path), "array", is_v3)
                     array_key = sub_array_keys[0]
                     root_path = root_path / str(group_key) / str(array_key)
                     return str(root_path.resolve()), axes_list
@@ -143,14 +202,23 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                     + "multiple resoulutions."
                 )
             elif isinstance(root, zarr.Group):
-                array_keys = self._list_zarr_children(store_path, "array")
+                array_keys = self._get_zarr_children(root, root_path, "array", is_v3)
                 if len(array_keys) > self.frontend.level:
                     root_path = root_path / str(self.frontend.level)
                     try:
-                        axes_metadata = root.attrs["multiscales"][0]["axes"]
-                        axes_list = "".join(
-                            axes["name"].upper() for axes in axes_metadata
-                        )
+                        # Try v3 location first (NGFF 0.5)
+                        ome_meta = root.attrs.get("ome", {})
+                        axes_metadata = ome_meta.get("multiscales", [{}])[0].get("axes")
+                        if axes_metadata:
+                            axes_list = "".join(
+                                axes["name"].upper() for axes in axes_metadata
+                            )
+                        else:
+                            # Fall back to v2 location
+                            axes_metadata = root.attrs["multiscales"][0]["axes"]
+                            axes_list = "".join(
+                                axes["name"].upper() for axes in axes_metadata
+                            )
                     except KeyError:
                         self.logger.warning(
                             "Unable to find multiscales metadata. Z, C and T "
@@ -184,7 +252,7 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         self.logger.debug("read_metadata(): Reading metadata...")
         if self._file_type == FileType.OmeTiff:
             return self.read_tiff_metadata()
-        if self._file_type == FileType.OmeZarrV2:
+        if self._file_type == FileType.OmeZarrV2 or self._file_type == FileType.OmeZarrV3:
             return self.read_zarr_metadata()
 
     def read_image(self, X, Y, Z, C, T):
@@ -344,12 +412,18 @@ class TensorstoreWriter(bfio.base_classes.TSAbstractWriter):
             self.frontend.X,
         )
 
+        # Check if user wants v3 format via frontend option
+        # For now, default to v2 to maintain backward compatibility
+        # Future: could add a frontend.zarr_version attribute
+        file_type = FileType.OmeZarrV2
+
         self._writer = TSWriter(
             str(self.frontend._file_path.joinpath("0").resolve()),
             shape,
             (1, 1, 1, self.frontend._TILE_SIZE, self.frontend._TILE_SIZE),
             self.frontend.dtype,
             "TCZYX",
+            file_type,
         )
 
         self.write_metadata()
