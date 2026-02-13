@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for zarr v3 support in bfio using unittest."""
+
 import json
 import tempfile
 import unittest
@@ -97,6 +98,28 @@ class TestZarr3Writer(unittest.TestCase):
             metadata_path = out_path / "OME" / "METADATA.ome.xml"
             self.assertTrue(metadata_path.exists())
 
+    def test_write_v3_multiscales_under_ome_key(self):
+        """Verify v3 writer stores multiscales under 'ome' key per NGFF 0.5."""
+        from bfio import BioWriter
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = Path(tmp) / "output.zarr"
+            data = numpy.random.randint(0, 255, (128, 128), dtype=numpy.uint8)
+
+            bw = BioWriter(out_path, backend="zarr3", X=128, Y=128, dtype=numpy.uint8)
+            bw[:128, :128, 0, 0, 0] = data
+            bw.close()
+
+            with open(out_path / "zarr.json") as f:
+                meta = json.load(f)
+            attrs = meta.get("attributes", {})
+            self.assertIn("ome", attrs)
+            self.assertIn("multiscales", attrs["ome"])
+            self.assertEqual(attrs["ome"]["version"], "0.5")
+            axes = attrs["ome"]["multiscales"][0]["axes"]
+            axis_names = [a["name"] for a in axes]
+            self.assertEqual(axis_names, ["t", "c", "z", "y", "x"])
+
 
 class TestZarr3Reader(unittest.TestCase):
     """Test Zarr3Reader reads v3 format stores."""
@@ -142,6 +165,40 @@ class TestZarr3Reader(unittest.TestCase):
             br = BioReader(out_path, backend="zarr3")
             self.assertEqual(br.X, 256)
             self.assertEqual(br.Y, 128)
+            self.assertEqual(br.Z, 2)
+            self.assertEqual(br.C, 3)
+            self.assertEqual(br.T, 1)
+            br.close()
+
+    def test_read_v3_axis_info_from_ome_key(self):
+        """Verify Zarr3Reader reads axis info from ome.multiscales per NGFF 0.5."""
+        from bfio import BioReader, BioWriter
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = Path(tmp) / "axis_test.zarr"
+            bw = BioWriter(
+                out_path,
+                backend="zarr3",
+                X=64,
+                Y=64,
+                Z=2,
+                C=3,
+                T=1,
+                dtype=numpy.uint8,
+            )
+            data = numpy.zeros((64, 64, 2, 3, 1), dtype=numpy.uint8)
+            bw.write(data)
+            bw.close()
+
+            # Verify the zarr.json has ome.multiscales with axes
+            with open(out_path / "zarr.json") as f:
+                meta = json.load(f)
+            axes = meta["attributes"]["ome"]["multiscales"][0]["axes"]
+            axis_names = [a["name"] for a in axes]
+            self.assertEqual(axis_names, ["t", "c", "z", "y", "x"])
+
+            # Verify reader correctly parses dimensions from ome key
+            br = BioReader(out_path, backend="zarr3")
             self.assertEqual(br.Z, 2)
             self.assertEqual(br.C, 3)
             self.assertEqual(br.T, 1)
