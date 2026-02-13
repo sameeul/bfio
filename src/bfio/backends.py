@@ -1661,6 +1661,35 @@ try:
 
             self._axes_list = []
 
+        def _get_axis_info(self):
+            shape_len = len(self._rdr.shape)
+            if shape_len == 5:
+                self._axes_list = ["t", "c", "z", "y", "x"]
+            else:
+                try:
+                    # OME-NGFF 0.5: multiscales is under attrs["ome"]["multiscales"]
+                    ome_meta = self._root.attrs["ome"]
+                    axes_metadata = ome_meta["multiscales"][0]["axes"]
+                    for axes in axes_metadata:
+                        self._axes_list.append(axes["name"])
+                except (AttributeError, KeyError):
+                    # Fall back to v2 location (attrs["multiscales"])
+                    try:
+                        axes_metadata = self._root.attrs["multiscales"][0]["axes"]
+                        for axes in axes_metadata:
+                            self._axes_list.append(axes["name"])
+                    except (AttributeError, KeyError):
+                        self.logger.warning(
+                            "Unable to find multiscales metadata. Z, C and T "
+                            + "dimensions might be incorrect."
+                        )
+                        if shape_len == 4:
+                            self._axes_list = ["c", "z", "y", "x"]
+                        elif shape_len == 3:
+                            self._axes_list = ["z", "y", "x"]
+                        elif shape_len == 2:
+                            self._axes_list = ["y", "x"]
+
         def read_metadata(self):
             self.logger.debug("read_metadata(): Reading metadata (v3)...")
             # First try OME metadata (same as v2)
@@ -1739,14 +1768,23 @@ try:
                 with open(metadata_path, "w") as fw:
                     fw.write(str(self.frontend._metadata.to_xml()))
 
-                self._root.attrs["multiscales"] = [
-                    {
-                        "version": "0.1",
-                        "name": self.frontend._file_path.name,
-                        "datasets": [{"path": "0"}],
-                        "metadata": {"method": "mean"},
-                    }
-                ]
+                self._root.attrs["ome"] = {
+                    "version": "0.5",
+                    "multiscales": [
+                        {
+                            "name": self.frontend._file_path.name,
+                            "axes": [
+                                {"name": "t", "type": "time"},
+                                {"name": "c", "type": "channel"},
+                                {"name": "z", "type": "space"},
+                                {"name": "y", "type": "space"},
+                                {"name": "x", "type": "space"},
+                            ],
+                            "datasets": [{"path": "0"}],
+                            "metadata": {"method": "mean"},
+                        }
+                    ],
+                }
 
             # Check for existing arrays when appending
             if self.frontend.append is True:
