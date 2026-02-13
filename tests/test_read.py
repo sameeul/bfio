@@ -61,6 +61,7 @@ def setUpModule():
             shape=(1, br.C, br.Z, br.Y, br.X),
             dtype=br.dtype,
             chunks=(1, 1, 1, 1024, 1024),
+            zarr_format=2,
         )
         for t in range(1):
             for c in range(br.C):

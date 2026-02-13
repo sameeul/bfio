@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # import core packages
+import json
+import pathlib
 import scyjava
 import copy
 import logging
@@ -443,3 +445,53 @@ def pixels_per_cm(
     pixels_per_cm = image_dim_px / physical_dim_cm
 
     return int(pixels_per_cm)
+
+
+def detect_zarr_format(path):
+    """Detect the zarr format version of a store on disk.
+
+    Checks for zarr.json (v3) or .zgroup/.zarray (v2) marker files.
+
+    Args:
+        path: Path to the zarr store directory (str or Path).
+
+    Returns:
+        int: 3 for zarr v3 format, 2 for zarr v2 format, 0 if unknown.
+    """
+    p = pathlib.Path(path)
+    if not p.is_dir():
+        return 0
+
+    # Check for v3 marker at root
+    zarr_json = p / "zarr.json"
+    if zarr_json.exists():
+        try:
+            with open(zarr_json) as f:
+                meta = json.load(f)
+            if meta.get("zarr_format") == 3:
+                return 3
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Check for v2 markers at root
+    if (p / ".zgroup").exists() or (p / ".zarray").exists():
+        return 2
+
+    # Recurse one level into subdirectories
+    try:
+        for child in sorted(p.iterdir()):
+            if child.is_dir():
+                if (child / "zarr.json").exists():
+                    try:
+                        with open(child / "zarr.json") as f:
+                            meta = json.load(f)
+                        if meta.get("zarr_format") == 3:
+                            return 3
+                    except (json.JSONDecodeError, OSError):
+                        pass
+                if (child / ".zgroup").exists() or (child / ".zarray").exists():
+                    return 2
+    except OSError:
+        pass
+
+    return 0

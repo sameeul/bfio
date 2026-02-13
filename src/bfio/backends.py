@@ -16,11 +16,14 @@ import ome_types
 from tifffile import tifffile
 from xml.etree import ElementTree as ET
 
-
 # bfio internals
 from bfio import __version__ as version
 import bfio.base_classes
-from bfio.utils import start, clean_ome_xml_for_known_issues, pixels_per_cm
+from bfio.utils import (
+    start,
+    clean_ome_xml_for_known_issues,
+    pixels_per_cm,
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)-8s - %(levelname)-8s - %(message)s",
@@ -1211,6 +1214,30 @@ try:
     import zarr
     from numcodecs import Blosc
 
+    def _list_zarr_children(path, child_type="array"):
+        """Filesystem-based fallback for enumerating zarr v2 store children.
+
+        In zarr-python v3, array_keys()/group_keys() may not reliably
+        enumerate v2 format stores. This function checks subdirectories
+        for .zarray (arrays) or .zgroup (groups) marker files.
+
+        Args:
+            path: Path to the zarr group directory (str or Path).
+            child_type: "array" to find arrays (.zarray), "group" to find
+                groups (.zgroup).
+
+        Returns:
+            Sorted list of child names.
+        """
+        p = Path(path)
+        marker = ".zarray" if child_type == "array" else ".zgroup"
+        children = []
+        if p.is_dir():
+            for child in p.iterdir():
+                if child.is_dir() and (child / marker).exists():
+                    children.append(child.name)
+        return sorted(children)
+
     class ZarrReader(bfio.base_classes.AbstractReader):
         logger = logging.getLogger("bfio.backends.ZarrReader")
 
@@ -1224,35 +1251,41 @@ try:
                 self._root = zarr.open(
                     str(self.frontend._file_path.resolve()), mode="r"
                 )
-            except zarr.errors.PathNotFoundError:
+            except (FileNotFoundError, KeyError):
                 # a workaround for pre-compute slide output directory structure
                 data_zarr_path = str(self.frontend._file_path.resolve()) + "/data.zarr"
                 self._root = zarr.open(data_zarr_path, mode="r")
 
+            store_path = str(self.frontend._file_path.resolve())
+
             if self.frontend.level is None:
-                if isinstance(self._root, zarr.core.Array):
+                if isinstance(self._root, zarr.Array):
                     self._rdr = self._root
-                elif isinstance(self._root, zarr.hierarchy.Group):
+                elif isinstance(self._root, zarr.Group):
                     # the top level is a group, check if this has any arrays
-                    num_arrays = len(sorted(self._root.array_keys()))
-                    if num_arrays > 0:
-                        self._rdr = self._root[next(self._root.array_keys())]
+                    array_keys = _list_zarr_children(store_path, "array")
+                    if len(array_keys) > 0:
+                        self._rdr = self._root[array_keys[0]]
                     else:
                         # need to go one more level
-                        self._root = self._root[next(self._root.group_keys())]
-                        self._rdr = self._root[next(self._root.array_keys())]
+                        group_keys = _list_zarr_children(store_path, "group")
+                        self._root = self._root[group_keys[0]]
+                        sub_path = str(Path(store_path) / group_keys[0])
+                        sub_array_keys = _list_zarr_children(sub_path, "array")
+                        self._rdr = self._root[sub_array_keys[0]]
                 else:
                     pass
             else:
-                if isinstance(self._root, zarr.core.Array):
+                if isinstance(self._root, zarr.Array):
                     self.close()
                     raise ValueError(
                         "Level is specified but the zarr file does not contain "
                         + "multiple resoulutions."
                     )
-                elif isinstance(self._root, zarr.hierarchy.Group):
-                    if len(sorted(self._root.array_keys())) > self.frontend.level:
-                        self._rdr = self._root[self.frontend.level]
+                elif isinstance(self._root, zarr.Group):
+                    array_keys = _list_zarr_children(store_path, "array")
+                    if len(array_keys) > self.frontend.level:
+                        self._rdr = self._root[str(self.frontend.level)]
                     else:
                         raise ValueError(
                             "The zarr file does not contain resolution "
@@ -1279,7 +1312,7 @@ try:
                     axes_metadata = self._root.attrs["multiscales"][data_key]["axes"]
                     for axes in axes_metadata:
                         self._axes_list.append(axes["name"])
-                except AttributeError or KeyError:
+                except (AttributeError, KeyError):
                     self.logger.warning(
                         "Unable to find multiscales metadata. Z, C and T "
                         + "dimensions might be incorrect."
@@ -1457,7 +1490,9 @@ try:
             if self.frontend.append is True:
                 mode = "a"
             self._root = zarr.open_group(
-                store=str(self.frontend._file_path.resolve()), mode=mode
+                store=str(self.frontend._file_path.resolve()),
+                mode=mode,
+                zarr_format=2,
             )
 
             # Create the metadata
@@ -1482,14 +1517,16 @@ try:
                         "metadata": {"method": "mean"},
                     }
                 ]
+
+            store_path = str(self.frontend._file_path.resolve())
             if (
                 self.frontend.append is True
-                and len(sorted(self._root.array_keys())) > 0
+                and len(_list_zarr_children(store_path, "array")) > 0
             ):
                 writer = self._root["0"]
             else:
-                writer = self._root.zeros(
-                    "0",
+                writer = self._root.create_array(
+                    name="0",
                     shape=shape,
                     chunks=(
                         1,
@@ -1499,8 +1536,8 @@ try:
                         self.frontend._TILE_SIZE,
                     ),
                     dtype=self.frontend.dtype,
-                    compressor=compressor,
-                    dimension_separator="/",
+                    compressors=compressor,
+                    fill_value=0,
                 )
 
             # This is recommended to do for cloud storage to increase read/write
@@ -1552,6 +1589,195 @@ try:
         def close(self):
             pass
 
+    class Zarr3Reader(ZarrReader):
+        """Reader for zarr v3 format stores using zarr-python v3 API."""
+
+        logger = logging.getLogger("bfio.backends.Zarr3Reader")
+
+        def __init__(self, frontend):
+            # Call AbstractReader.__init__ directly, skip ZarrReader.__init__
+            bfio.base_classes.AbstractReader.__init__(self, frontend)
+
+            self.logger.debug("__init__(): Initializing _rdr (zarr v3)...")
+            self.logger.debug(f"Level is {self.frontend.level}")
+
+            try:
+                self._root = zarr.open(
+                    str(self.frontend._file_path.resolve()), mode="r"
+                )
+            except (FileNotFoundError, KeyError):
+                data_zarr_path = str(self.frontend._file_path.resolve()) + "/data.zarr"
+                self._root = zarr.open(data_zarr_path, mode="r")
+
+            if self.frontend.level is None:
+                if isinstance(self._root, zarr.Array):
+                    self._rdr = self._root
+                elif isinstance(self._root, zarr.Group):
+                    # Use native v3 group enumeration
+                    array_names = sorted(
+                        k for k, v in self._root.members() if isinstance(v, zarr.Array)
+                    )
+                    if len(array_names) > 0:
+                        self._rdr = self._root[array_names[0]]
+                    else:
+                        group_names = sorted(
+                            k
+                            for k, v in self._root.members()
+                            if isinstance(v, zarr.Group)
+                        )
+                        self._root = self._root[group_names[0]]
+                        array_names = sorted(
+                            k
+                            for k, v in self._root.members()
+                            if isinstance(v, zarr.Array)
+                        )
+                        self._rdr = self._root[array_names[0]]
+                else:
+                    pass
+            else:
+                if isinstance(self._root, zarr.Array):
+                    self.close()
+                    raise ValueError(
+                        "Level is specified but the zarr file does not contain "
+                        + "multiple resoulutions."
+                    )
+                elif isinstance(self._root, zarr.Group):
+                    array_names = sorted(
+                        k for k, v in self._root.members() if isinstance(v, zarr.Array)
+                    )
+                    if len(array_names) > self.frontend.level:
+                        self._rdr = self._root[str(self.frontend.level)]
+                    else:
+                        raise ValueError(
+                            "The zarr file does not contain resolution "
+                            + "level {}.".format(self.frontend.level)
+                        )
+                else:
+                    raise ValueError(
+                        "The zarr file does not contain resolution level {}.".format(
+                            self.frontend.level
+                        )
+                    )
+
+            self._axes_list = []
+
+        def read_metadata(self):
+            self.logger.debug("read_metadata(): Reading metadata (v3)...")
+            # First try OME metadata (same as v2)
+            metadata_path = self.frontend._file_path.joinpath("OME").joinpath(
+                "METADATA.ome.xml"
+            )
+            if metadata_path.exists():
+                if self._metadata is None:
+                    with open(metadata_path) as fr:
+                        metadata = fr.read()
+
+                    try:
+                        self._metadata = ome_types.from_xml(metadata, validate=False)
+                    except ET.ParseError:
+                        if self.frontend.clean_metadata:
+                            cleaned = clean_ome_xml_for_known_issues(metadata)
+                            self._metadata = ome_types.from_xml(cleaned, validate=False)
+                            self.logger.warning(
+                                "read_metadata(): OME XML required reformatting."
+                            )
+                        else:
+                            raise
+
+                if self.frontend.level is not None:
+                    self._metadata.images[0].pixels.size_x = self._rdr.shape[-1]
+                    self._metadata.images[0].pixels.size_y = self._rdr.shape[-2]
+
+                return self._metadata
+
+            # Fall back to constructing metadata from array shape
+            return super().read_metadata()
+
+    class Zarr3Writer(ZarrWriter):
+        """Writer for zarr v3 format stores using zarr-python v3 API."""
+
+        logger = logging.getLogger("bfio.backends.Zarr3Writer")
+
+        def __init__(self, frontend):
+            super().__init__(frontend)
+
+        def _init_writer(self):
+            """Initialize file writing for zarr v3 format."""
+            if self.frontend.append is False:
+                if self.frontend._file_path.exists():
+                    shutil.rmtree(self.frontend._file_path)
+
+            shape = (
+                self.frontend.T,
+                self.frontend.C,
+                self.frontend.Z,
+                self.frontend.Y,
+                self.frontend.X,
+            )
+
+            mode = "w"
+            if self.frontend.append is True:
+                mode = "a"
+
+            self._root = zarr.open_group(
+                store=str(self.frontend._file_path.resolve()),
+                mode=mode,
+                zarr_format=3,
+            )
+
+            # Create the metadata
+            metadata_path = (
+                Path(self.frontend._file_path)
+                .joinpath("OME")
+                .joinpath("METADATA.ome.xml")
+            )
+
+            if self.frontend.append is False or (
+                self.frontend.append is True and metadata_path.exists() is False
+            ):
+                metadata_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(metadata_path, "w") as fw:
+                    fw.write(str(self.frontend._metadata.to_xml()))
+
+                self._root.attrs["multiscales"] = [
+                    {
+                        "version": "0.1",
+                        "name": self.frontend._file_path.name,
+                        "datasets": [{"path": "0"}],
+                        "metadata": {"method": "mean"},
+                    }
+                ]
+
+            # Check for existing arrays when appending
+            if self.frontend.append is True:
+                existing_arrays = sorted(
+                    k for k, v in self._root.members() if isinstance(v, zarr.Array)
+                )
+                if len(existing_arrays) > 0:
+                    writer = self._root["0"]
+                    self._writer = writer
+                    return
+
+            writer = self._root.create_array(
+                name="0",
+                shape=shape,
+                chunks=(
+                    1,
+                    1,
+                    1,
+                    self.frontend._TILE_SIZE,
+                    self.frontend._TILE_SIZE,
+                ),
+                dtype=self.frontend.dtype,
+                serializer=zarr.codecs.BytesCodec(),
+                compressors=zarr.codecs.ZstdCodec(level=1),
+                fill_value=0,
+            )
+
+            # Skip zarr.consolidate_metadata() — not part of v3 spec
+
+            self._writer = writer
+
 except ModuleNotFoundError:
     logger.info(
         "Zarr backend is not available. This could be due to a "
@@ -1569,3 +1795,11 @@ except ModuleNotFoundError:
             raise ImportError(
                 "ZarrWriter class unavailable. Could not import" + " zarr."
             )
+
+    class Zarr3Reader(bfio.base_classes.AbstractReader):
+        def __init__(self, frontend):
+            raise ImportError("Zarr3Reader class unavailable. Could not import zarr.")
+
+    class Zarr3Writer(bfio.base_classes.AbstractWriter):
+        def __init__(self, frontend):
+            raise ImportError("Zarr3Writer class unavailable. Could not import zarr.")
