@@ -13,7 +13,7 @@ A conda distribution is also available in the conda-forge channel. To install it
 
 Java and Bio-Formats
 -------------------
-``bfio`` can be used without Java, but only the ``python`` and ``zarr``
+``bfio`` can be used without Java, but only the ``python``, ``zarr``, ``zarr3``, and ``tensorstore``
 backends will be usable. This means only files in tiled OME Tiff or OME Zarr format can be
 read/written.
 

@@ -31,7 +31,7 @@ Docker containers with all necessary components are available (see
 
 ### Setting up Java
 
-**Note:** `bfio` can be used without Java, but only the `python` and `zarr`
+**Note:** `bfio` can be used without Java, but only the `python`, `zarr`, `zarr3`, and `tensorstore`
 backends will be usable. This means only files in tiled OME Tiff or OME Zarr format can be
 read/written.
 

@@ -44,11 +44,6 @@ RUN git apply --directory=bfio_src /bfio_src/docker/m2_repo.patch
 # Install
 RUN python3 -m pip install /bfio_src --no-cache-dir
 
-#Apply jgo copy patch
-RUN git apply \
-    --directory=usr/local/lib/python${PYTHON_VERSION}/site-packages \
-    /bfio_src/docker/jgo_copy.patch
-
 # Install packages
 ENV LIBRARY_PATH=/lib:/usr/lib
 
