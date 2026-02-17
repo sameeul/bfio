@@ -436,7 +436,7 @@ class TestZarrTSReader(unittest.TestCase):
         ) as br:
             self.assertEqual(br._backend_name, "tensorstore")
             # Level 1 should be downsampled by 2x
-            self.assertEqual(br.shape, (4489, 3255, 1, 1))
+            self.assertEqual(br.shape, (4489, 3255))
 
 
 class TestZarrMetadata(unittest.TestCase):
