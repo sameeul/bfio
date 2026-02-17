@@ -49,11 +49,6 @@ RUN git apply --directory=bfio_src /bfio_src/docker/m2_repo.patch
 # Install using the new Python
 RUN python${PYTHON_VERSION} -m pip install /bfio_src --no-cache-dir
 
-# Apply jgo copy patch
-RUN git apply \
-    --directory=usr/local/lib/python${PYTHON_VERSION}/dist-packages \
-    /bfio_src/docker/jgo_copy.patch
-
 # clean up
 RUN rm -rf /bfio_src
 

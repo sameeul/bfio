@@ -8,7 +8,7 @@ Introduction
 
 The bfio package is designed to make it easy to process arbitrarily sized images
 in a fast, scalable way. The two core classes, :doc:`/Reference/BioReader` and
-:doc:`/Reference/BioWriter`, can use one of three different backends depending
+:doc:`/Reference/BioWriter`, can use one of five different backends depending
 on the file type that will be read. Usually, the proper backend will be selected
 when opening a file. For cases where bfio fails to select the proper backend, the 
 ``backend`` parameter can be passed to the constructor. The following backends
@@ -20,10 +20,14 @@ are available in ``bfio``.
 2. ``backend="bioformats"`` can be used to read any
    `any format supported by Bio-Formats <https://docs.openmicroscopy.org/bio-formats/8.0.1/supported-formats.html>`_.
    The BioWriter with java backend will only save images as OME tiled tiff.
-3. ``backend="zarr"`` can be used to read/write a subset of Zarr files following
+3. ``backend="zarr"`` can be used to read/write a subset of Zarr v2 files following
    the `OME Zarr spec <https://ngff.openmicroscopy.org/latest/>`_.
+4. ``backend="zarr3"`` can be used to read/write Zarr v3 files following
+   the `OME Zarr spec <https://ngff.openmicroscopy.org/latest/>`_.
+5. ``backend="tensorstore"`` provides optimized reading/writing for both OME Tiff 
+   and OME Zarr (v2 and v3) files with enhanced performance.
 
-The advantage to using the ``python`` and ``zarr`` backends are speed and
+The advantage to using the ``python``, ``zarr``, ``zarr3``, and ``tensorstore`` backends are speed and
 scalability at the expense of a rigid file structure, while the ``bioformats`` backend
 provides broad access to a wide array of file types but is considerably slower.
 
