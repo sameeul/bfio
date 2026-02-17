@@ -76,7 +76,8 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         In zarr-python v3, array_keys()/group_keys() are unreliable for v2 stores.
         This function checks subdirectories for .zarray or .zgroup marker files.
 
-        NOTE: Only use this for v2 stores. For v3 stores, use root.array_keys()/group_keys().
+        NOTE: Only use this for v2 stores.
+              For v3 stores, use root.array_keys()/group_keys().
         """
         from pathlib import Path as _Path
 
@@ -128,7 +129,7 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
 
         # Detect zarr format to choose appropriate enumeration method
         zarr_format = detect_zarr_format(root_path)
-        is_v3 = (zarr_format == 3)
+        is_v3 = zarr_format == 3
 
         axes_list = ""
         store_path = str(root_path.resolve())
@@ -164,7 +165,9 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                     return str(root_path.resolve()), axes_list
                 else:
                     # need to go one more level
-                    group_keys = self._get_zarr_children(root, root_path, "group", is_v3)
+                    group_keys = self._get_zarr_children(
+                        root, root_path, "group", is_v3
+                    )
                     group_key = group_keys[0]
                     root = root[group_key]
                     try:
@@ -188,7 +191,9 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
                         )
 
                     sub_path = str(Path(store_path) / group_key)
-                    sub_array_keys = self._get_zarr_children(root, Path(sub_path), "array", is_v3)
+                    sub_array_keys = self._get_zarr_children(
+                        root, Path(sub_path), "array", is_v3
+                    )
                     array_key = sub_array_keys[0]
                     root_path = root_path / str(group_key) / str(array_key)
                     return str(root_path.resolve()), axes_list
@@ -252,7 +257,10 @@ class TensorstoreReader(bfio.base_classes.TSAbstractReader):
         self.logger.debug("read_metadata(): Reading metadata...")
         if self._file_type == FileType.OmeTiff:
             return self.read_tiff_metadata()
-        if self._file_type == FileType.OmeZarrV2 or self._file_type == FileType.OmeZarrV3:
+        if (
+            self._file_type == FileType.OmeZarrV2
+            or self._file_type == FileType.OmeZarrV3
+        ):
             return self.read_zarr_metadata()
 
     def read_image(self, X, Y, Z, C, T):

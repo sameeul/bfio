@@ -344,13 +344,13 @@ class TestZarrReader(unittest.TestCase):
     def test_read_zarr_v3(self):
         """Testing zarr v3 format (NGFF 0.5) read with zarr backend"""
         with bfio.BioReader(
-            TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"), backend="zarr"
+            TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"), backend="zarr3"
         ) as br:
             get_dims(br)
             # Verify it's using the zarr backend
-            self.assertEqual(br._backend_name, "zarr")
+            self.assertEqual(br._backend_name, "zarr3")
             # Verify dimensions are read correctly
-            self.assertEqual(br.shape, (8978, 6510, 1, 1))
+            self.assertEqual(br.shape, (8978, 6510))
             # Verify we can actually read data
             data = br[:100, :100, 0, 0]
             self.assertEqual(data.shape, (100, 100))
@@ -410,7 +410,7 @@ class TestZarrTSReader(unittest.TestCase):
             # Verify it's using the tensorstore backend
             self.assertEqual(br._backend_name, "tensorstore")
             # Verify dimensions are read correctly
-            self.assertEqual(br.shape, (8978, 6510, 1, 1))
+            self.assertEqual(br.shape, (8978, 6510))
             # Verify we can actually read data
             data = br[:100, :100, 0, 0]
             self.assertEqual(data.shape, (100, 100))
@@ -423,16 +423,16 @@ class TestZarrTSReader(unittest.TestCase):
         with bfio.BioReader(
             TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"),
             backend="tensorstore",
-            level=0
+            level=0,
         ) as br:
             self.assertEqual(br._backend_name, "tensorstore")
-            self.assertEqual(br.shape, (8978, 6510, 1, 1))
+            self.assertEqual(br.shape, (8978, 6510))
 
         # Test resolution level 1
         with bfio.BioReader(
             TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"),
             backend="tensorstore",
-            level=1
+            level=1,
         ) as br:
             self.assertEqual(br._backend_name, "tensorstore")
             # Level 1 should be downsampled by 2x
