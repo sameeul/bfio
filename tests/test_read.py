@@ -11,6 +11,7 @@ import zarr
 from ome_zarr.utils import download as zarr_download
 
 TEST_IMAGES = {
+    "ExpD_chicken_embryo_MIP.ome.zarr": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0066/ExpD_chicken_embryo_MIP.ome.zarr",
     "5025551.zarr": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0054A/5025551.zarr",
     "Plate1-Blue-A-12-Scene-3-P3-F2-03.czi": "https://downloads.openmicroscopy.org/images/Zeiss-CZI/idr0011/Plate1-Blue-A_TS-Stinger/Plate1-Blue-A-12-Scene-3-P3-F2-03.czi",
     "0.tif": "https://osf.io/j6aer/download",
@@ -340,6 +341,22 @@ class TestZarrReader(unittest.TestCase):
             get_dims(br)
             self.assertEqual(br.shape, (1350, 1351, 1, 27))
 
+    def test_read_zarr_v3(self):
+        """Testing zarr v3 format (NGFF 0.5) read with zarr backend"""
+        with bfio.BioReader(
+            TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"), backend="zarr3"
+        ) as br:
+            get_dims(br)
+            # Verify it's using the zarr backend
+            self.assertEqual(br._backend_name, "zarr3")
+            # Verify dimensions are read correctly
+            self.assertEqual(br.shape, (8978, 6510))
+            # Verify we can actually read data
+            data = br[:100, :100, 0, 0]
+            self.assertEqual(data.shape, (100, 100))
+            # Verify dtype
+            self.assertEqual(br.dtype, np.uint8)
+
 
 class TestZarrTSReader(unittest.TestCase):
     def test_get_dims(self):
@@ -383,6 +400,43 @@ class TestZarrTSReader(unittest.TestCase):
         ) as br:
             get_dims(br)
             self.assertEqual(br.shape, (1350, 1351, 1, 27))
+
+    def test_read_zarr_v3(self):
+        """Testing zarr v3 format (NGFF 0.5) read with tensorstore backend"""
+        with bfio.BioReader(
+            TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"), backend="tensorstore"
+        ) as br:
+            get_dims(br)
+            # Verify it's using the tensorstore backend
+            self.assertEqual(br._backend_name, "tensorstore")
+            # Verify dimensions are read correctly
+            self.assertEqual(br.shape, (8978, 6510))
+            # Verify we can actually read data
+            data = br[:100, :100, 0, 0]
+            self.assertEqual(data.shape, (100, 100))
+            # Verify dtype
+            self.assertEqual(br.dtype, np.uint8)
+
+    def test_read_zarr_v3_multi_resolution(self):
+        """Testing zarr v3 multi-resolution read with tensorstore backend"""
+        # Test resolution level 0 (highest resolution)
+        with bfio.BioReader(
+            TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"),
+            backend="tensorstore",
+            level=0,
+        ) as br:
+            self.assertEqual(br._backend_name, "tensorstore")
+            self.assertEqual(br.shape, (8978, 6510))
+
+        # Test resolution level 1
+        with bfio.BioReader(
+            TEST_DIR.joinpath("ExpD_chicken_embryo_MIP.ome.zarr"),
+            backend="tensorstore",
+            level=1,
+        ) as br:
+            self.assertEqual(br._backend_name, "tensorstore")
+            # Level 1 should be downsampled by 2x
+            self.assertEqual(br.shape, (4489, 3255))
 
 
 class TestZarrMetadata(unittest.TestCase):
